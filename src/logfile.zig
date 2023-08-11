@@ -35,10 +35,13 @@ pub const LogFile = struct {
     id: u32,
     fileName: []u8,
     handle: File,
-    writePosition: usize,
+    maxSize: usize,
+    //Warning: this might not be coorect tiil we have read the actual file content 
+    // given that the files is pre-allocated with fixe  size. 
+    writePosition: usize, 
     allocator: Allocator,
 
-    pub fn open(allocator: Allocator, dir: Dir, id: u32, maxSize: usize,) !Self {
+    pub fn openOrCreate(allocator: Allocator, dir: Dir, id: u32, maxSize: usize) !Self {
         var fileName = try std.fmt.allocPrint(allocator, "{d:0>16}", .{id});
         errdefer allocator.free(fileName);
 
@@ -55,6 +58,7 @@ pub const LogFile = struct {
             .id = id,
             .fileName = fileName,
             .handle = fileHandle,
+            .maxSize = maxSize,
             .writePosition = 0,
             .allocator = allocator,
         };
@@ -70,6 +74,10 @@ pub const LogFile = struct {
 
     pub fn setWritePosition(self: *Self, position: usize) void {
         self.writePosition = position;
+    }
+
+    pub fn isFull(self: *const Self) bool {
+        return self.writePosition >= self.maxSize;
     }
 
     // key_size,value_size, key, val
@@ -175,7 +183,7 @@ test "Log File" {
     const expect = std.testing.expect;
     const allocator = std.testing.allocator;
 
-    var logFile = try LogFile.open(allocator, std.fs.cwd(), 12, 0);
+    var logFile = try LogFile.openOrCreate(allocator, std.fs.cwd(), 12, 0);
     defer logFile.deinit();
 
     const key = "name";
@@ -203,7 +211,7 @@ test "Log File iterator" {
     const expect = std.testing.expect;
     const allocator = std.testing.allocator;
 
-    var logFile = try LogFile.open(allocator, std.fs.cwd(), 11, 0);
+    var logFile = try LogFile.openOrCreate(allocator, std.fs.cwd(), 11, 0);
     defer logFile.deinit();
 
     const data = [_][]const u8{ "foo", "bar", "baz", "biz" };

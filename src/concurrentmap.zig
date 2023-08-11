@@ -129,6 +129,7 @@ test "Concurent map shard" {
     try cms.put("12", 12);
     try expect(cms.itemsCount() == 3);
     try expect(cms.get("10") == 10);
+    try expect(cms.get("2") == null);
 
     try expect(cms.remove("10") == true);
     try expect(cms.remove("2") == false);

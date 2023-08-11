@@ -1,6 +1,13 @@
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
 const File = std.fs.File;
+const Dir = std.fs.Dir;
+const ArrayList = std.ArrayList;
+const parseInt = std.fmt.parseInt;
+const stem = std.fs.path.stem;
+
+
 
 // Pre-allocate file size.
 // TODO: find a better way
@@ -16,8 +23,15 @@ pub fn setFileSize(file: *File, desiredSize: usize, comptime bufferSize: usize) 
     try file.sync();
 }
 
-// @intCast cannot be easily used in certain situation because 
-// it cannot infer the type.
-pub fn toInt(comptime T: type, v: anytype) T {
-    return @intCast(v);
+pub fn ownedFileIdsFromDir(allocator: Allocator, path: Dir) ![]u32 {
+    var fileIds = ArrayList(u32).init();
+    const dirIter = path.openIterableDir(".", .{});
+    defer dirIter.close();
+    while (try dirIter.next()) |path| {
+        if (path.kind == .File) {
+            const fileId try parseInt(u32, stem(path.name), 10);  
+            try fileIds.append(id);
+        }
+    }
+    return fileIds.toOwnedSlice();
 }
