@@ -1,32 +1,27 @@
 const std = @import("std");
 const fs = std.fs;
 
-
-
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
-    //var dir = try fs.cwd().makeOpenPath("foo/test", .{});
-    //var dir = try fs.cwd().makeDir("foot/test");
-    //var dir = try fs.openDirAbsolute("./foo/test", .{});
-    //_ = try dir.openIterableDir(".", .{});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    const dir = try std.fmt.parseInt(u32, std.fs.path.stem("00012.bin"), 10);  
+    const bitcask = @import("./bitcask.zig");
+    const Storage = bitcask.Storage;
+    const Params = bitcask.Params;
+    const dbDir = try std.fs.cwd().makeOpenPath("testdb", .{});
+    var store = try Storage.open(allocator, dbDir, Params.small);
+    defer store.deinit();
 
+    const key = "name";
+    const value = "Mary James";
 
-    try stdout.print("EVAN: {}.\n", .{dir});
+    try store.put(key, value);
 
-    // const LogFile = @import("./logfile.zig").LogFile;
-    // var logfile = try LogFile.open(std.fs.cwd(), 12, 1024);
+    const v = (try store.get(key)).?;
+    defer store.free(v);
 
-    // const key = "name";
-    // const value = "evance";
-    // const info = try logfile.writeItem(key, value);
-
-    // var buff = [_]u8{0}**32;
-    // _ = try logfile.readValue(info[1], &buff);
-
-    
+    try stdout.print("KV-> `{s}`:`{s}` \n", .{ key, v });
 }
-
-

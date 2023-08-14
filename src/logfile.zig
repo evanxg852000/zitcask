@@ -8,7 +8,7 @@ const Dir = std.fs.Dir;
 const File = std.fs.File;
 
 pub const Item = struct {
-    key: []const u8, 
+    key: []const u8,
     value: []const u8,
     offset: usize,
 };
@@ -31,14 +31,12 @@ pub const ReadItem = struct {
 
 pub const LogFile = struct {
     const Self = @This();
-        
+
     id: u32,
     fileName: []u8,
     handle: File,
     maxSize: usize,
-    //Warning: this might not be coorect tiil we have read the actual file content 
-    // given that the files is pre-allocated with fixe  size. 
-    writePosition: usize, 
+    writePosition: usize,
     allocator: Allocator,
 
     pub fn openOrCreate(allocator: Allocator, dir: Dir, id: u32, maxSize: usize) !Self {
@@ -48,13 +46,12 @@ pub const LogFile = struct {
         var fileHandle: File = undefined;
         fileHandle = dir.openFile(fileName, .{ .mode = .read_write }) catch blk: {
             fileHandle = try dir.createFile(fileName, .{ .read = true });
-            if (maxSize > 0) {
-                try setFileSize(&fileHandle, maxSize, 4096);
-            }
+            //TODO: add file pre-allocation feature later.
+            // try setFileSize(&fileHandle, maxSize, 4096);
             break :blk fileHandle;
         };
 
-        return Self {
+        return Self{
             .id = id,
             .fileName = fileName,
             .handle = fileHandle,
@@ -83,16 +80,17 @@ pub const LogFile = struct {
     // key_size,value_size, key, val
     pub fn writeItem(self: *Self, key: []const u8, value: []const u8) !WrittenItem {
         var pos = self.writePosition;
+
         try self.handle.seekTo(pos);
-        const writer  = self.handle.writer();
+        const writer = self.handle.writer();
         try writer.writeIntLittle(u32, @as(u32, @intCast(key.len)));
         try writer.writeIntLittle(u32, @as(u32, @intCast(value.len)));
         _ = try writer.write(key);
         _ = try writer.write(value);
         try self.sync();
 
-        self.writePosition +=  8 + key.len + value.len;
-        return WrittenItem {
+        self.writePosition += 8 + key.len + value.len;
+        return WrittenItem{
             .itemOffset = pos,
             .valueOffset = pos + 8 + key.len,
         };
@@ -104,7 +102,7 @@ pub const LogFile = struct {
 
     fn readItemAlloc(self: *Self, itemOffset: usize) !ReadItem {
         try self.handle.seekTo(itemOffset);
-        const reader  = self.handle.reader();
+        const reader = self.handle.reader();
         const keySize = try reader.readIntLittle(u32);
         const valueSize = try reader.readIntLittle(u32);
 
@@ -114,7 +112,7 @@ pub const LogFile = struct {
         var valueBuffer = try self.allocator.alloc(u8, @as(usize, valueSize));
         _ = try reader.readAll(valueBuffer);
 
-        return ReadItem {
+        return ReadItem{
             .itemOffset = itemOffset,
             .valueOffset = itemOffset + 8 + keyBuffer.len,
             .key = keyBuffer,
@@ -129,7 +127,7 @@ pub const LogFile = struct {
 
     pub fn readValueAlloc(self: *Self, valueOffset: usize, valueSize: usize) ![]u8 {
         try self.handle.seekTo(valueOffset);
-        const reader  = self.handle.reader();
+        const reader = self.handle.reader();
         var buffer = try self.allocator.alloc(u8, valueSize);
         _ = try reader.readAll(buffer);
         return buffer;
@@ -152,7 +150,7 @@ pub const LogFileIterator = struct {
     logFile: *LogFile,
 
     pub fn init(logFile: *LogFile) Self {
-        return Self {
+        return Self{
             .offset = 0,
             .eof = false,
             .logFile = logFile,
@@ -160,24 +158,26 @@ pub const LogFileIterator = struct {
     }
 
     pub fn next(self: *Self) ?ReadItem {
-        if(self.eof) {
+        if (self.eof) {
             return null;
         }
 
-        const readItem  = self.logFile.readItemAlloc(self.offset) catch blk: {
+        const readItem = self.logFile.readItemAlloc(self.offset) catch blk: {
             self.eof = true;
             break :blk null;
         };
 
-        if(readItem) |payload| {
+        if (readItem) |payload| {
             self.offset += payload.size();
         }
-        
+
         return readItem;
     }
 
+    pub fn getOffset(self: *Self) usize {
+        return self.offset;
+    }
 };
-
 
 test "Log File" {
     const expect = std.testing.expect;
@@ -194,7 +194,7 @@ test "Log File" {
 
     const fetchedValue = try logFile.readValueAlloc(writtenItem.valueOffset, value.len);
     defer logFile.freeValue(fetchedValue);
-    
+
     try expect(std.mem.eql(u8, fetchedValue, value));
 
     const readItem = try logFile.readItemAlloc(0);
@@ -206,7 +206,6 @@ test "Log File" {
     try expect(readItem.valueOffset == 12);
 }
 
-
 test "Log File iterator" {
     const expect = std.testing.expect;
     const allocator = std.testing.allocator;
@@ -215,16 +214,15 @@ test "Log File iterator" {
     defer logFile.deinit();
 
     const data = [_][]const u8{ "foo", "bar", "baz", "biz" };
-    for(data) |item| {
+    for (data) |item| {
         _ = try logFile.writeItem(item, item);
-    }    
-    
-    var iter =  logFile.iterator();
+    }
+
+    var iter = logFile.iterator();
     var index: usize = 0;
-    while(iter.next()) |readItem| : (index +=1) {
+    while (iter.next()) |readItem| : (index += 1) {
         try expect(std.mem.eql(u8, readItem.key, data[index]));
         try expect(std.mem.eql(u8, readItem.value, data[index]));
         logFile.freeReadItem(readItem);
     }
 }
-
