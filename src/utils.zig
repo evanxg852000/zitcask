@@ -34,9 +34,3 @@ pub fn ownedFileIdsFromDir(allocator: Allocator, path: Dir) ![]u32 {
     }
     return fileIds.toOwnedSlice();
 }
-
-pub fn copy(allocator: Allocator, v: []const u8) ![]const u8 {
-    const result = try allocator.alloc(u8, v.len);
-    @memcpy(result, v);
-    return result;
-}

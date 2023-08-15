@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const utils = @import("./utils.zig");
-
 const Allocator = std.mem.Allocator;
 const Mutex = std.Thread.Mutex;
 const ArrayList = std.ArrayList;
@@ -45,7 +43,7 @@ fn HashMapShard(comptime V: type) type {
         fn put(self: *Self, key: []const u8, value: V) !void {
             self.mutex.lock();
             defer self.mutex.unlock();
-            const ownedKey = try utils.copy(self.allocator, key);
+            const ownedKey = try self.allocator.dupe(u8, key);
             const oldEntryOpt = try self.items.fetchPut(ownedKey, value);
             if (oldEntryOpt) |_| {
                 self.allocator.free(ownedKey);
