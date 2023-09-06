@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
-const Mutex = std.Thread.Mutex;
+const RwLock = std.Thread.RwLock;
 const ArrayList = std.ArrayList;
 const StringHashMap = std.StringHashMap;
 const Fnv1a_32 = std.hash.Fnv1a_32;
@@ -13,13 +13,13 @@ fn HashMapShard(comptime V: type) type {
         const Self = @This();
 
         items: StringHashMap(V),
-        mutex: std.Thread.Mutex,
+        mutex: RwLock,
         allocator: Allocator,
 
         fn init(allocator: Allocator) Self {
             return Self{
                 .items = StringHashMap(V).init(allocator),
-                .mutex = Mutex{},
+                .mutex = RwLock{},
                 .allocator = allocator,
             };
         }
@@ -35,8 +35,8 @@ fn HashMapShard(comptime V: type) type {
         }
 
         fn itemsCount(self: *Self) usize {
-            self.mutex.lock();
-            defer self.mutex.unlock();
+            self.mutex.lockShared();
+            defer self.mutex.unlockShared();
             return self.items.count();
         }
 
@@ -51,8 +51,8 @@ fn HashMapShard(comptime V: type) type {
         }
 
         fn get(self: *Self, key: []const u8) ?V {
-            self.mutex.lock();
-            defer self.mutex.unlock();
+            self.mutex.lockShared();
+            defer self.mutex.unlockShared();
             return self.items.get(key);
         }
 
